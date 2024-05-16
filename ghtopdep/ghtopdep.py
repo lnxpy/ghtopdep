@@ -36,7 +36,17 @@ if pipdate.needs_checking(PACKAGE_NAME):
 
 class OneDayHeuristic(BaseHeuristic):
     cacheable_by_default_statuses = {
-        200, 203, 204, 206, 300, 301, 404, 405, 410, 414, 501
+        200,
+        203,
+        204,
+        206,
+        300,
+        301,
+        404,
+        405,
+        410,
+        414,
+        501,
     }
 
     def update_headers(self, response):
@@ -45,7 +55,10 @@ class OneDayHeuristic(BaseHeuristic):
 
         date = parsedate(response.headers["date"])
         expires = datetime.datetime(*date[:6]) + datetime.timedelta(days=1)
-        return {"expires": formatdate(calendar.timegm(expires.timetuple())), "cache-control": "public"}
+        return {
+            "expires": formatdate(calendar.timegm(expires.timetuple())),
+            "cache-control": "public",
+        }
 
     def warning(self, response):
         msg = "Automatically cached! Response is Stale."
@@ -54,7 +67,7 @@ class OneDayHeuristic(BaseHeuristic):
 
 def already_added(repo_url, repos):
     for repo in repos:
-        if repo['url'] == repo_url:
+        if repo["url"] == repo_url:
             return True
 
 
@@ -63,7 +76,9 @@ def fetch_description(gh, relative_url):
     repository = gh.repository(owner, repository)
     repo_description = " "
     if repository.description:
-        repo_description = textwrap.shorten(repository.description, width=60, placeholder="...")
+        repo_description = textwrap.shorten(
+            repository.description, width=60, placeholder="..."
+        )
     return repo_description
 
 
@@ -89,63 +104,97 @@ def readable_stars(repos):
     return repos
 
 
-def show_result(repos, total_repos_count, more_than_zero_count, destinations, table):
+def show_result(
+    repos, total_repos_count, more_than_zero_count, destinations, table, output
+):
     if table:
         if repos:
             repos = readable_stars(repos)
             click.echo(tabulate(repos, headers="keys", tablefmt="github"))
-            click.echo("found {0} {1} others {2} are private".format(total_repos_count, destinations, destinations))
-            click.echo("found {0} {1} with more than zero star".format(more_than_zero_count, destinations))
+            click.echo(
+                "found {0} {1} others {2} are private".format(
+                    total_repos_count, destinations, destinations
+                )
+            )
+            click.echo(
+                "found {0} {1} with more than zero star".format(
+                    more_than_zero_count, destinations
+                )
+            )
         else:
-            click.echo("Doesn't find any {0} that match search request".format(destinations))
+            click.echo(
+                "Doesn't find any {0} that match search request".format(destinations)
+            )
     else:
-        click.echo(json.dumps(repos))
+        result = json.dumps(repos)
+        if output:
+            with open(output, "w") as stream:
+                stream.write(result)
+        else:
+            click.echo(json.dumps(repos))
 
 
 def get_page_url(sess, url, destination):
-    page_url = "{0}/network/dependents?dependent_type={1}".format(url, destination.upper())
+    page_url = "{0}/network/dependents?dependent_type={1}".format(
+        url, destination.upper()
+    )
     main_response = sess.get(page_url)
     parsed_node = HTMLParser(main_response.text)
-    link = parsed_node.css('.select-menu-item')
+    link = parsed_node.css(".select-menu-item")
     if link:
         packages = []
         for i in link:
-            repo_url = "https://github.com/{}".format(i.attributes['href'])
+            repo_url = "https://github.com/{}".format(i.attributes["href"])
             res = requests.get(repo_url)
             parsed_item = HTMLParser(res.text)
             package_id = urlparse(i.attributes["href"]).query.split("=")[1]
-            selector = '.table-list-filters a:first-child'
+            selector = ".table-list-filters a:first-child"
             count = parsed_item.css(selector)[0].text().split()[0].replace(",", "")
             packages.append({"count": int(count), "package_id": package_id})
-        sorted_packages = sorted(packages, key=lambda k: k['count'], reverse=True)
+        sorted_packages = sorted(packages, key=lambda k: k["count"], reverse=True)
         most_popular_package_id = sorted_packages[0].get("package_id")
-        page_url = "{0}/network/dependents?dependent_type={1}&package_id={2}".format(url, destination.upper(),
-                                                                                     most_popular_package_id)
+        page_url = "{0}/network/dependents?dependent_type={1}&package_id={2}".format(
+            url, destination.upper(), most_popular_package_id
+        )
     return page_url
 
 
 @click.command()
 @click.argument("url")
-@click.option("--repositories/--packages", default=True, help="Sort repositories or packages (default repositories)")
+@click.option(
+    "--repositories/--packages",
+    default=True,
+    help="Sort repositories or packages (default repositories)",
+)
 @click.option("--table/--json", default=True, help="View mode")
 @click.option("--report", is_flag=True, help="Report")
-@click.option("--description", is_flag=True, help="Show description of packages or repositories (performs additional "
-                                                  "request per repository)")
+@click.option(
+    "--description",
+    is_flag=True,
+    help="Show description of packages or repositories (performs additional "
+    "request per repository)",
+)
 @click.option("--rows", default=10, help="Number of showing repositories (default=10)")
 @click.option("--minstar", default=5, help="Minimum number of stars (default=5)")
+@click.option(
+    "--output",
+    help="Expert the json output into a file",
+)
 @click.option("--search", help="search code at dependents (repositories/packages)")
 @click.option("--token", envvar="GHTOPDEP_TOKEN")
-def cli(url, repositories, search, table, rows, minstar, report, description, token):
+def cli(
+    url, repositories, search, table, rows, minstar, output, report, description, token
+):
     MODE = os.environ.get("GHTOPDEP_ENV")
-    BASE_URL = 'http://159.223.231.170'
+    BASE_URL = "http://159.223.231.170"
     if MODE == "development":
-        BASE_URL = 'http://127.0.0.1:3000'
+        BASE_URL = "http://127.0.0.1:3000"
 
     owner, repository = urlparse(url).path[1:].split("/")
 
     if report:
         try:
-            result = requests.get('{}/repos/{}/{}'.format(BASE_URL, owner, repository))
+            result = requests.get("{}/repos/{}/{}".format(BASE_URL, owner, repository))
             if result.status_code != 404:
                 sorted_repos = sort_repos(result.json(), rows)
                 repos = readable_stars(sorted_repos)
@@ -156,9 +205,9 @@ def cli(url, repositories, search, table, rows, minstar, report, description, to
 
     if (description or search) and token:
         gh = github3.login(token=token)
-        CacheControl(gh.session,
-                     cache=FileCache(CACHE_DIR),
-                     heuristic=OneDayHeuristic())
+        CacheControl(
+            gh.session, cache=FileCache(CACHE_DIR), heuristic=OneDayHeuristic()
+        )
     elif (description or search) and not token:
         click.echo("Please provide token")
         sys.exit()
@@ -174,13 +223,10 @@ def cli(url, repositories, search, table, rows, minstar, report, description, to
     total_repos_count = 0
 
     sess = requests.session()
-    retries = Retry(
-        total=15,
-        backoff_factor=15,
-        status_forcelist=[429])
-    adapter = CacheControlAdapter(max_retries=retries,
-                                  cache=FileCache(CACHE_DIR),
-                                  heuristic=OneDayHeuristic())
+    retries = Retry(total=15, backoff_factor=15, status_forcelist=[429])
+    adapter = CacheControlAdapter(
+        max_retries=retries, cache=FileCache(CACHE_DIR), heuristic=OneDayHeuristic()
+    )
     sess.mount("http://", adapter)
     sess.mount("https://", adapter)
 
@@ -211,16 +257,15 @@ def cli(url, repositories, search, table, rows, minstar, report, description, to
                 if not is_already_added and repo_url != url:
                     if description:
                         repo_description = fetch_description(gh, relative_repo_url)
-                        repos.append({
-                            "url": repo_url,
-                            "stars": repo_stars_num,
-                            "description": repo_description
-                        })
+                        repos.append(
+                            {
+                                "url": repo_url,
+                                "stars": repo_stars_num,
+                                "description": repo_description,
+                            }
+                        )
                     else:
-                        repos.append({
-                            "url": repo_url,
-                            "stars": repo_stars_num
-                        })
+                        repos.append({"url": repo_url, "stars": repo_stars_num})
 
         node = parsed_node.css(NEXT_BUTTON_SELECTOR)
         if len(node) == 2:
@@ -232,7 +277,15 @@ def cli(url, repositories, search, table, rows, minstar, report, description, to
 
     if report:
         try:
-            requests.post('{}/repos'.format(BASE_URL), json={"url": url, "owner": owner, "repository": repository, "deps": repos})
+            requests.post(
+                "{}/repos".format(BASE_URL),
+                json={
+                    "url": url,
+                    "owner": owner,
+                    "repository": repository,
+                    "deps": repos,
+                },
+            )
         except requests.exceptions.ConnectionError as e:
             click.echo(e)
 
@@ -244,4 +297,11 @@ def cli(url, repositories, search, table, rows, minstar, report, description, to
             for s in gh.search_code("{0} repo:{1}".format(search, repo_path)):
                 click.echo("{0} with {1} stars".format(s.html_url, repo["stars"]))
     else:
-        show_result(sorted_repos, total_repos_count, more_than_zero_count, destinations, table)
+        show_result(
+            sorted_repos,
+            total_repos_count,
+            more_than_zero_count,
+            destinations,
+            table,
+            output,
+        )
