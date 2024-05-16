@@ -12,7 +12,6 @@ install_requires = \
  'cachecontrol>=0.12.5,<0.13.0',
  'click>=8.1.2,<9.0.0',
  'github3.py>=3.2.0,<4.0.0',
- 'halo>=0.0.31,<0.0.32',
  'lockfile>=0.12.2,<0.13.0',
  'pipdate>=0.5.6,<0.6.0',
  'requests>=2.22,<3.0',
