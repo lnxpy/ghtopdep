@@ -16,7 +16,6 @@ from urllib3.util.retry import Retry
 from cachecontrol.caches import FileCache
 from cachecontrol.heuristics import BaseHeuristic
 from cachecontrol import CacheControl, CacheControlAdapter
-from halo import Halo
 from selectolax.parser import HTMLParser
 from tabulate import tabulate
 
@@ -173,8 +172,6 @@ def cli(url, repositories, search, table, rows, minstar, report, description, to
     repos = []
     more_than_zero_count = 0
     total_repos_count = 0
-    spinner = Halo(text="Fetching information about {0}".format(destinations), spinner="dots")
-    spinner.start()
 
     sess = requests.session()
     retries = Retry(
@@ -229,7 +226,6 @@ def cli(url, repositories, search, table, rows, minstar, report, description, to
         if len(node) == 2:
             page_url = node[1].attributes["href"]
         elif len(node) == 0 or node[0].text() == "Previous":
-            spinner.stop()
             break
         elif node[0].text() == "Next":
             page_url = node[0].attributes["href"]
